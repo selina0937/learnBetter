@@ -15,7 +15,7 @@
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* 列印專用樣式：優化 PDF 生成版面 */
+        /* 列印專用樣式 */
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
@@ -36,8 +36,7 @@
         const { useState, useEffect, Fragment } = React;
 
         // --- Gemini API 串接邏輯 ---
-        // 提示：404 錯誤代表模型 ID 找不到，與 Billing（付費資訊）無關。
-        // 請確保您的金鑰貼在下方引號中。
+        // 請確保在此填入正確的 API Key
         const apiKey = "AIzaSyD-0UEeZYRsesGJz9FuNJn4hL9TQqK_9Ok"; 
         
         async function fetchGeminiAI(userDecision, checks, modelName) {
@@ -46,30 +45,38 @@
             要求：生成約 300 字感官豐富的未來模擬劇本。包含光線、聲音、氣味及達成後的成就感。請直接輸出內容。`;
             const userQuery = `決策：『${userDecision}』。檢核點：${activeChecks || '無'}。`;
 
-            // 修正點：使用 v1 代替 v1beta 以提高穩定性，這通常能解決 404 問題
-            const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
+            // 針對 404 的終極解決方案：使用 v1beta 並確保模型名稱不帶多餘的前綴
+            const cleanModelName = modelName.replace('models/', '');
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${apiKey}`;
             
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] }
-                })
-            });
-            
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                const status = response.status;
-                const message = errorBody.error?.message || "未知 API 錯誤";
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
                 
-                const err = new Error(message);
-                err.status = status;
-                throw err;
+                if (!response.ok) {
+                    const errorBody = await response.json().catch(() => ({}));
+                    const status = response.status;
+                    const message = errorBody.error?.message || "未知 API 錯誤";
+                    
+                    const err = new Error(message);
+                    err.status = status;
+                    err.urlCalled = url.split('?')[0]; // 診斷用，隱藏 Key
+                    throw err;
+                }
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('AI 回傳內容為空（可能被過濾器阻擋）');
+                return text;
+            } catch (error) {
+                throw error;
             }
-            
-            const result = await response.json();
-            return result.candidates?.[0]?.content?.parts?.[0]?.text;
         }
 
         // --- 核心組件：圖標渲染 ---
@@ -122,7 +129,7 @@
                 <div className="relative border-l-2 border-slate-200 ml-4 space-y-12">
                     {[
                         { stage: "階段一：MVP 基礎", focus: "直覺捕捉與邏輯檢核", desc: "建立決策捕捉介面，串接啟發法與偏誤提醒。已完成核心 UI。", icon: "brain", status: "Done" },
-                        { stage: "階段二：AI 模擬核心", focus: "系統三模擬艙 (Gemini)", desc: "整合 Gemini 1.5 模型，自動生成高品質未來劇本。目前正在解決 API 適配問題。", icon: "sparkles", status: "Running" },
+                        { stage: "階段二：AI 模擬核心", focus: "系統三模擬艙 (Gemini)", desc: "整合 Gemini 1.5 模型，自動生成高品質未來劇本。目前正在解決 404 路徑適配問題。", icon: "sparkles", status: "Running" },
                         { stage: "階段三：環境助推", focus: "執行力 Nudge 引擎", desc: "開發環境設置建議，整合手機提醒，確保決策能持久執行。", icon: "check", status: "Next" }
                     ].map((item, i) => (
                         <div key={i} className="relative pl-10">
@@ -220,8 +227,8 @@
                 setIsAiLoading(true);
                 setAiError(null);
                 
-                // 定義一組嘗試列表，優先嘗試穩定版模型 ID
-                const retryModels = [selectedModel, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+                // 優先嘗試最穩定的組合
+                const retryModels = [selectedModel, 'gemini-1.5-flash', 'gemini-1.5-pro'];
                 
                 for (let model of retryModels) {
                     try {
@@ -229,11 +236,15 @@
                         setData(prev => ({...prev, futureScript: script}));
                         setAiError(null);
                         setIsAiLoading(false);
-                        return; // 成功即退出
+                        return; 
                     } catch (e) {
                         console.warn(`Model ${model} failed: ${e.message}`);
                         if (model === retryModels[retryModels.length - 1]) {
-                            setAiError(`最終重試失敗 (${e.status || 'Error'}): ${e.message}`);
+                            setAiError({
+                                status: e.status,
+                                msg: e.message,
+                                url: e.urlCalled
+                            });
                         }
                     }
                 }
@@ -296,7 +307,7 @@
                                                             {isAiLoading ? (
                                                                 <div className="flex flex-col items-center gap-3">
                                                                     <div className="loading-spinner"></div>
-                                                                    <span className="text-sm font-medium animate-pulse">正在嘗試連接 v1 端點與穩定模型...</span>
+                                                                    <span className="text-sm font-medium animate-pulse">正在嘗試連接 v1beta 端點...</span>
                                                                 </div>
                                                             ) : (
                                                                 <Fragment>
@@ -308,15 +319,19 @@
                                                         {aiError && (
                                                             <div className="mt-6 p-5 bg-red-50 border border-red-100 rounded-3xl text-red-600 text-xs leading-relaxed">
                                                                 <p className="font-bold mb-1 flex items-center gap-2 uppercase tracking-widest"><Icon name="alert" className="w-3 h-3"/> API 存取異常 (404)</p>
-                                                                <p className="mb-2">找不到模型或 API 路徑。這與 Billing 無關。</p>
-                                                                <div className="p-2 bg-white/50 rounded-lg mb-3">
-                                                                    <p className="font-mono scale-90 origin-left opacity-70">最後嘗試路徑: v1/models/{selectedModel}</p>
+                                                                <p className="mb-2">無法在您的區域或權限內找到此模型路徑。</p>
+                                                                <div className="p-3 bg-white/60 rounded-lg mb-3 font-mono text-[10px] break-all border border-red-100">
+                                                                    URL: {aiError.url} <br/>
+                                                                    Error: {aiError.msg}
                                                                 </div>
                                                                 <p className="font-bold text-red-700">解決建議：</p>
                                                                 <ul className="list-disc pl-4 space-y-1">
-                                                                    <li>請手動切換至 <button onClick={()=>{setSelectedModel('gemini-1.5-flash'); handleAiGeneration();}} className="underline font-bold">gemini-1.5-flash</button> (推薦)</li>
-                                                                    <li>或是嘗試 <button onClick={()=>{setSelectedModel('gemini-1.5-pro'); handleAiGeneration();}} className="underline font-bold">gemini-1.5-pro</button></li>
-                                                                    <li>若持續 404，請檢查您的 VPN 是否切換至支援 Gemini 的區域（如：美國、台灣）。</li>
+                                                                    <li>請確認程式碼頂部 <b>apiKey</b> 已填寫。</li>
+                                                                    <li>嘗試切換模型： 
+                                                                        <button onClick={()=>{setSelectedModel('gemini-1.5-flash'); handleAiGeneration();}} className="mx-1 px-2 py-0.5 bg-white border border-red-200 rounded hover:bg-red-50 font-bold">1.5-flash</button>
+                                                                        <button onClick={()=>{setSelectedModel('gemini-1.5-pro'); handleAiGeneration();}} className="mx-1 px-2 py-0.5 bg-white border border-red-200 rounded hover:bg-red-50 font-bold">1.5-pro</button>
+                                                                    </li>
+                                                                    <li>若持續 404，請檢查您的 VPN 是否切換至支援 Gemini 的區域（如：台灣、美國、新加坡）。</li>
                                                                 </ul>
                                                             </div>
                                                         )}
