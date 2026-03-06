@@ -35,59 +35,30 @@
         const getStoredKey = () => sessionStorage.getItem('COGNAV_API_KEY') || "";
         const saveKeyToStorage = (key) => sessionStorage.setItem('COGNAV_API_KEY', key.trim().replace(/\s/g, ''));
 
-        async function fetchGeminiAI(userDecision, checks) {
-            const currentKey = getStoredKey().trim();
-            if (!currentKey) throw { status: "Auth", msg: "請先點擊設定輸入 API Key。" };
-
-            const prompt = `你是認知科學專家。請針對以下決策生成約 300 字、感官豐富的未來模擬劇本。
-            
-            決策內容：『${userDecision}』
-            已通過檢核：${checks.filter(c => c.checked).map(c => c.text).join('、') || '無'}
-            
-            要求：1.包含具體感官細節(光線、聲音、氣味) 2.描述成功後的情感滿足 3.語氣溫暖具啟發性。請直接輸出劇本內容，不要有前言。`;
-
-            // --- 針對 2.5-flash 優化：全自動連鎖嘗試清單 ---
-            // 根據您的查詢結果，優先嘗試 gemini-2.5-flash
+        // --- 通用 AI 請求函數 ---
+        async function callGemini(currentKey, prompt) {
             const trials = [
                 { ver: 'v1beta', mod: 'gemini-2.5-flash-preview-09-2025' },
                 { ver: 'v1beta', mod: 'gemini-2.5-flash' },
-                { ver: 'v1', mod: 'gemini-2.5-flash' },
-                { ver: 'v1beta', mod: 'gemini-1.5-flash' },
-                { ver: 'v1', mod: 'gemini-1.5-flash' },
-                { ver: 'v1beta', mod: 'gemini-1.5-pro' }
+                { ver: 'v1', mod: 'gemini-2.5-flash' }
             ];
 
             let lastErr = null;
-            let attemptedPaths = [];
-
             for (let trial of trials) {
                 const url = `https://generativelanguage.googleapis.com/${trial.ver}/models/${trial.mod}:generateContent?key=${currentKey}`;
-                attemptedPaths.push(`${trial.ver}/${trial.mod}`);
-                
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
-
                     const data = await response.json();
-                    
-                    if (response.ok) {
-                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (text) return text;
-                    } else {
-                        lastErr = { 
-                            status: response.status, 
-                            msg: data.error?.message || "伺服器無回應",
-                            tried: attemptedPaths.join(' -> ')
-                        };
-                    }
+                    if (response.ok) return data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    lastErr = { status: response.status, msg: data.error?.message };
                 } catch (e) {
-                    lastErr = { status: "FetchError", msg: e.message, tried: attemptedPaths.join(' -> ') };
+                    lastErr = { status: "Network", msg: e.message };
                 }
             }
-
             throw lastErr;
         }
 
@@ -104,9 +75,9 @@
                     case 'file': return <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />;
                     case 'settings': return <g><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></g>;
                     case 'key': return <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3L15.5 7.5z"/>;
+                    case 'zap': return <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />;
                     case 'chevronRight': return <polyline points="9 18 15 12 9 6" />;
                     case 'chevronLeft': return <polyline points="15 18 9 12 15 6" />;
-                    case 'info': return <g><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></g>;
                     default: return <circle cx="12" cy="12" r="10" />;
                 }
             };
@@ -124,14 +95,15 @@
                     <h2 className="text-3xl font-extrabold text-indigo-900 text-center tracking-tighter">實施路徑圖</h2>
                     <div className="space-y-6 text-left">
                         {[
-                            { title: "階段一：MVP 基礎建設", desc: "完成核心 UI、系統一/二檢查清單與 PDF 報告功能。" },
-                            { title: "階段二：AI 2.5-Flash 整合 (當前)", desc: "升級至 Gemini 2.5 模型，提供更精準的情感模擬與更快的響應。" },
-                            { title: "階段三：智慧助推與行動", desc: "根據決策內容自動提供環境設置建議與持續執行機制。" }
+                            { title: "階段一：MVP 基礎建設", desc: "完成直覺捕捉與邏輯檢核基礎功能 (Done)." },
+                            { title: "階段二：AI 2.5-Flash 整合", desc: "實現系統三未來感官模擬劇本 (Done)." },
+                            { title: "階段三：智慧助推與環境", desc: "AI 自動根據決策生成 Nudge 環境助推方案 (當前)." },
+                            { title: "階段四：商業化與安全隱藏", desc: "導入後端 Proxy 隱藏 API Key 並建立付費訂閱制。" }
                         ].map((stage, idx) => (
-                            <div key={idx} className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center shrink-0 font-bold">{idx + 1}</div>
+                            <div key={idx} className={`flex gap-4 p-5 rounded-2xl border ${idx === 2 ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-200 ring-opacity-50' : 'bg-slate-50 border-slate-100'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold ${idx === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-white'}`}>{idx + 1}</div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800">{stage.title}</h4>
+                                    <h4 className={`font-bold ${idx === 2 ? 'text-indigo-900' : 'text-slate-800'}`}>{stage.title}</h4>
                                     <p className="text-sm text-slate-500 font-medium">{stage.desc}</p>
                                 </div>
                             </div>
@@ -148,32 +120,38 @@
                     <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-6 mb-8 text-left">
                         <div>
                             <h1 className="text-3xl font-bold text-indigo-900 mb-1 font-inter uppercase tracking-tight">Cognitive Audit Report</h1>
-                            <p className="text-slate-500 text-sm italic font-medium">COGNAV 三系統決策導航分析報告 • Powered by Gemini 2.5</p>
+                            <p className="text-slate-500 text-sm italic font-medium tracking-wide">三系統決策導航分析報告 • Powered by Gemini 2.5-Flash</p>
                         </div>
                         <div className="text-right text-xs font-bold text-slate-400">
                             <p>生成日期：{new Date().toLocaleDateString()}</p>
                         </div>
                     </div>
-                    <div className="space-y-8">
+                    <div className="space-y-10">
                         <section>
                             <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-orange-500 mb-3 uppercase tracking-widest text-xs">Step 1: Intuition</h2>
                             <p className="text-xl font-medium leading-relaxed pl-4">{data.decision || "未輸入內容"}</p>
                         </section>
                         <section>
-                            <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-blue-500 mb-3 uppercase tracking-widest text-xs">Step 2: Logical Audit</h2>
-                            <div className="pl-4 space-y-2 font-medium">
+                            <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-blue-500 mb-3 uppercase tracking-widest text-xs">Step 2: Logic</h2>
+                            <div className="pl-4 space-y-2 font-medium text-slate-700">
                                 {data.system2Checks.map((item, i) => (
                                     <div key={i} className="flex items-center gap-3">
-                                        <span className={item.checked ? "text-emerald-600 font-bold" : "text-slate-300"}>{item.checked ? "✓" : "✗"}</span>
-                                        <span className={item.checked ? "text-slate-900" : "text-slate-400"}>{item.text}</span>
+                                        <span>{item.checked ? "✓" : "✗"}</span>
+                                        <span>{item.text}</span>
                                     </div>
                                 ))}
                             </div>
                         </section>
                         <section>
                             <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-indigo-600 mb-3 uppercase tracking-widest text-xs">Step 3: Future Simulation</h2>
-                            <div className="italic bg-indigo-50 p-6 rounded-2xl text-indigo-900 leading-relaxed whitespace-pre-wrap text-sm shadow-inner min-h-[100px] pl-4 font-medium">
-                                {data.futureScript || "⚠️ 尚未生成 AI 模擬內容。"}
+                            <div className="italic bg-indigo-50 p-6 rounded-2xl text-indigo-900 leading-relaxed whitespace-pre-wrap text-sm font-medium">
+                                {data.futureScript || "⚠️ 未生成模擬劇本。"}
+                            </div>
+                        </section>
+                        <section>
+                            <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-emerald-500 mb-3 uppercase tracking-widest text-xs">Step 4: Smart Nudges</h2>
+                            <div className="pl-4 space-y-4 font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {data.nudges || "⚠️ 未生成助推建議。"}
                             </div>
                         </section>
                     </div>
@@ -189,6 +167,7 @@
             const [view, setView] = useState('flow'); 
             const [step, setStep] = useState(1);
             const [isAiLoading, setIsAiLoading] = useState(false);
+            const [isNudgeLoading, setIsNudgeLoading] = useState(false);
             const [aiError, setAiError] = useState(null);
             const [showKeyModal, setShowKeyModal] = useState(false);
             const [tempKey, setTempKey] = useState(getStoredKey());
@@ -199,7 +178,8 @@
                     { text: "我徵詢過三位反對者的真實意見。", checked: false },
                     { text: "我能承受失敗後產生的具體後果。", checked: false }
                 ],
-                futureScript: ''
+                futureScript: '',
+                nudges: ''
             });
 
             useEffect(() => {
@@ -213,16 +193,40 @@
             };
 
             const handleAiGeneration = async () => {
-                if (!data.decision) return;
+                const key = getStoredKey();
+                if (!key) { setShowKeyModal(true); return; }
                 setIsAiLoading(true); setAiError(null);
                 try {
-                    const text = await fetchGeminiAI(data.decision, data.system2Checks);
+                    const text = await callGemini(key, `你是認知科學專家。針對決策：『${data.decision}』，生成一段 300 字、感官豐富的未來成功模擬劇本。包含視覺、聽覺、嗅覺。直接輸出內容。`);
                     setData(prev => ({...prev, futureScript: text}));
                 } catch (e) { 
                     setAiError(e); 
                     if (e.status === 401) setShowKeyModal(true);
                 } finally { setIsAiLoading(false); }
             };
+
+            const handleNudgeGeneration = async () => {
+                const key = getStoredKey();
+                if (!key) return;
+                setIsNudgeLoading(true);
+                try {
+                    const prompt = `你是行為經濟學家。根據使用者決策：『${data.decision}』及其未來模擬內容：『${data.futureScript}』，設計 3 個具體的「環境助推 (Nudge)」方案。
+                    1. 增加負面行為摩擦力（例如：把手機關機放在客廳）。
+                    2. 降低正面行為摩擦力（例如：睡前把書翻開放在枕頭旁）。
+                    3. 視覺/物理提示（例如：Step 3 的劇本截圖設為桌面）。
+                    請用列點方式具體描述，語氣專業且實務。直接輸出建議內容。`;
+                    const text = await callGemini(key, prompt);
+                    setData(prev => ({...prev, nudges: text}));
+                } catch (e) { console.error(e); }
+                finally { setIsNudgeLoading(false); }
+            };
+
+            // 自動觸發助推生成 (當進入第四步且內容為空時)
+            useEffect(() => {
+                if (step === 4 && !data.nudges && data.decision && !isNudgeLoading) {
+                    handleNudgeGeneration();
+                }
+            }, [step]);
 
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 tracking-tight font-sans">
@@ -245,14 +249,15 @@
                                     <Fragment>
                                         {step === 1 && (
                                             <div className="fade-in">
-                                                <h2 className="text-3xl font-extrabold mb-6 text-indigo-900 tracking-tighter text-left">捕捉<span className="text-indigo-600">直覺</span></h2>
-                                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed">在理智介入之前，寫下大腦最初始的想法。</p>
-                                                <textarea className="w-full p-6 bg-slate-50 border-2 rounded-3xl h-44 outline-none focus:border-indigo-500 font-medium text-lg shadow-inner" placeholder="例如：我想辭職去創業..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
+                                                <h2 className="text-3xl font-extrabold mb-6 text-indigo-900 tracking-tighter">捕捉<span className="text-indigo-600">直覺</span></h2>
+                                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed italic">System 1 Audit：在理智介入前，寫下你最真實的聲音。</p>
+                                                <textarea className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-3xl h-44 outline-none focus:border-indigo-500 font-medium text-lg shadow-inner" placeholder="例如：我想把儲蓄投入這次的投資，因為看起來很有機會..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
                                             </div>
                                         )}
                                         {step === 2 && (
                                             <div className="fade-in">
-                                                <h2 className="text-3xl font-extrabold mb-6 tracking-tighter text-left font-inter">理智檢核</h2>
+                                                <h2 className="text-3xl font-extrabold mb-6 tracking-tighter">理智檢核</h2>
+                                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed italic text-left">System 2 Analysis：啟動冷靜的慢思考，檢測統計與機率偏誤。</p>
                                                 <div className="space-y-4">
                                                     {data.system2Checks.map((item, i) => (
                                                         <div key={i} onClick={() => toggleCheck(i)} className={`p-5 rounded-2xl border-2 flex items-center gap-4 cursor-pointer transition-all ${item.checked ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
@@ -266,35 +271,23 @@
                                         {step === 3 && (
                                             <div className="fade-in text-center">
                                                 <h2 className="text-3xl font-extrabold mb-6 tracking-tighter">未來模擬艙</h2>
+                                                <p className="text-slate-500 mb-8 text-sm font-medium leading-relaxed italic text-left">System 3 Simulation：將邏輯與感官連結，建立持久的行為動力。</p>
                                                 {!data.futureScript ? (
                                                     <Fragment>
                                                         <button onClick={handleAiGeneration} disabled={isAiLoading} className="w-full py-10 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:bg-indigo-100 transition-all text-indigo-600 font-bold group">
                                                             {isAiLoading ? (
-                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在透過 Gemini 2.5 生成劇本...</span></div>
+                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在調用 Gemini 2.5 進行感官渲染...</span></div>
                                                             ) : (
                                                                 <Fragment><Icon name="sparkles" className="w-10 h-10 group-hover:scale-110 transition-transform" /><span>啟動 AI 感官劇本生成</span></Fragment>
                                                             )}
                                                         </button>
-                                                        {aiError && (
-                                                            <div className="mt-6 p-6 bg-red-50 border border-red-100 rounded-3xl text-red-600 text-xs text-left">
-                                                                <p className="font-bold mb-2 flex items-center gap-2 uppercase tracking-widest text-sm"><Icon name="alert" className="w-4 h-4"/> 錯誤排除資訊 ({aiError.status})</p>
-                                                                <p className="mb-2 font-mono bg-white/50 p-3 rounded-xl border border-red-100 leading-relaxed break-all">{aiError.msg}</p>
-                                                                <div className="flex items-center gap-2 opacity-70 italic mb-2">
-                                                                    <Icon name="info" className="w-3 h-3" />
-                                                                    <span>嘗試路徑：{aiError.tried}</span>
-                                                                </div>
-                                                                <p className="font-bold text-red-800">提示：</p>
-                                                                <p className="mt-1">請確認您的 API Key 權限。目前系統優先尋找 2.5-Flash 模型。</p>
-                                                            </div>
-                                                        )}
+                                                        {aiError && <p className="mt-4 text-red-500 text-xs font-mono break-all">{aiError.msg}</p>}
                                                     </Fragment>
                                                 ) : (
                                                     <div className="p-8 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl relative text-left">
                                                         <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">System 3 Future Script</span>
-                                                            <button onClick={() => setData({...data, futureScript: ''})} className="text-[10px] text-slate-400 hover:text-white uppercase font-bold flex items-center gap-1 transition-colors">
-                                                                重新生成
-                                                            </button>
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">Identity Alignment Simulation</span>
+                                                            <button onClick={() => setData({...data, futureScript: ''})} className="text-[10px] text-slate-400 hover:text-white uppercase font-bold flex items-center gap-1 transition-colors">重新生成</button>
                                                         </div>
                                                         <p className="text-slate-200 italic leading-relaxed whitespace-pre-wrap font-medium">{data.futureScript}</p>
                                                     </div>
@@ -302,13 +295,33 @@
                                             </div>
                                         )}
                                         {step === 4 && (
-                                            <div className="fade-in text-center py-10">
-                                                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-50"><Icon name="check" className="w-10 h-10" /></div>
-                                                <h2 className="text-4xl font-extrabold mb-4 tracking-tighter text-indigo-900">審計完成</h2>
-                                                <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed max-w-xs mx-auto text-center">您的認知審計已完成。這不只是轉念，而是讓理智與潛意識動力達成對齊。</p>
-                                                <button onClick={() => window.print()} className="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold shadow-xl hover:bg-indigo-700 flex items-center gap-3 mx-auto active:scale-95 shadow-indigo-100">
-                                                    <Icon name="file" className="w-5 h-5" /> 下載 PDF 報告書
-                                                </button>
+                                            <div className="fade-in">
+                                                <div className="flex items-center gap-3 text-emerald-600 mb-6">
+                                                    <Icon name="zap" className="w-6 h-6" />
+                                                    <h2 className="text-3xl font-extrabold tracking-tighter">智慧助推建議</h2>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {isNudgeLoading ? (
+                                                        <div className="p-12 bg-emerald-50 rounded-[2rem] flex flex-col items-center gap-4 text-emerald-700">
+                                                            <div className="loading-spinner border-t-emerald-600"></div>
+                                                            <p className="font-bold animate-pulse">正在根據決策與願景設計環境助推方案...</p>
+                                                        </div>
+                                                    ) : (
+                                                        <Fragment>
+                                                            <div className="bg-emerald-50 p-8 rounded-[2rem] border border-emerald-100 text-emerald-900 font-medium leading-relaxed whitespace-pre-wrap">
+                                                                {data.nudges || "正在生成建議中..."}
+                                                            </div>
+                                                            <div className="flex gap-4">
+                                                                <button onClick={handleNudgeGeneration} className="text-xs text-emerald-600 underline font-bold px-2 py-1">重新生成助推方案</button>
+                                                            </div>
+                                                        </Fragment>
+                                                    )}
+                                                </div>
+                                                <div className="mt-12 text-center py-6 border-t border-slate-50">
+                                                    <button onClick={() => window.print()} className="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold shadow-xl hover:bg-indigo-700 flex items-center gap-3 mx-auto active:scale-95 shadow-indigo-100 transition-all">
+                                                        <Icon name="file" className="w-5 h-5" /> 下載完整 PDF 決策報告
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
 
@@ -331,13 +344,11 @@
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl fade-in border border-indigo-50">
                                 <div className="flex items-center gap-3 text-indigo-600 mb-6">
-                                    <div className="bg-indigo-50 p-2 rounded-xl">
-                                        <Icon name="key" className="w-6 h-6" />
-                                    </div>
-                                    <h3 className="text-2xl font-extrabold tracking-tight">API 安全設定</h3>
+                                    <div className="bg-indigo-50 p-2 rounded-xl"><Icon name="key" className="w-6 h-6" /></div>
+                                    <h3 className="text-2xl font-extrabold tracking-tight text-left">API 安全設定</h3>
                                 </div>
-                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed">
-                                    請填入支援 <b>Gemini 2.5-Flash</b> 的 API Key。金鑰僅存在本機分頁的 Session 中，不會上傳。
+                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed text-left">
+                                    請填入支援 <b>Gemini 2.5-Flash</b> 的 API Key。金鑰僅存在本機分頁，不會上傳到 GitHub。
                                 </p>
                                 <input 
                                     type="password" 
@@ -347,8 +358,8 @@
                                     onChange={(e)=>setTempKey(e.target.value)}
                                 />
                                 <div className="flex gap-3">
-                                    <button onClick={() => setShowKeyModal(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold hover:bg-slate-200 transition-all text-slate-600 text-sm">暫不輸入</button>
-                                    <button onClick={() => { saveKeyToStorage(tempKey); setShowKeyModal(false); }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 text-sm">儲存並啟動</button>
+                                    <button onClick={() => setShowKeyModal(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold hover:bg-slate-200 transition-all text-slate-600 text-sm">取消</button>
+                                    <button onClick={() => { saveKeyToStorage(tempKey); setShowKeyModal(false); }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 text-sm">儲存設定</button>
                                 </div>
                             </div>
                         </div>
