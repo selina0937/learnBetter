@@ -38,7 +38,7 @@
         // --- Gemini API 串接邏輯 ---
         const apiKey = "AIzaSyD-0UEeZYRsesGJz9FuNJn4hL9TQqK_9Ok"; // 請在此填入您的 API Key
         
-        async function generateFutureScript(userDecision, checks, modelName = "gemini-1.5-flash") {
+        async function generateFutureScript(userDecision, checks, modelName = "models/gemini-1.5-flash") {
             const activeChecks = checks.filter(c => c.checked).map(c => c.text).join('、');
             const systemPrompt = `你是一位認知科學專家，擅長『系統三』模擬推理（Simulated Reasoning）。
             你的任務是協助使用者將其決策轉化為感官豐富的未來模擬，以建立持久的內在動力。
