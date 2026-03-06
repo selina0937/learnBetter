@@ -36,9 +36,11 @@
         const { useState, useEffect, Fragment } = React;
 
         // --- Gemini API 串接邏輯 ---
-        const apiKey = "AIzaSyD-0UEeZYRsesGJz9FuNJn4hL9TQqK_9Ok"; // 請在此填入您的 API Key
+        // 1. 前往 https://aistudio.google.com/ 生成 API Key
+        // 2. 將金鑰貼在下方引號中
+        const apiKey = "AIzaSyD-0UEeZYRsesGJz9FuNJn4hL9TQqK_9Ok"; 
         
-        async function generateFutureScript(userDecision, checks, modelName = "models/gemini-1.5-flash") {
+        async function generateFutureScript(userDecision, checks, modelName = "gemini-1.5-flash") {
             const activeChecks = checks.filter(c => c.checked).map(c => c.text).join('、');
             const systemPrompt = `你是一位認知科學專家，擅長『系統三』模擬推理（Simulated Reasoning）。
             你的任務是協助使用者將其決策轉化為感官豐富的未來模擬，以建立持久的內在動力。
@@ -53,7 +55,7 @@
             我已通過的邏輯檢核：${activeChecks || '基本完整性檢查'}。
             請根據這些資訊，為我生成一段對應的『系統三』未來模擬劇本。`;
 
-            // 使用 v1beta 或是 v1 端點。如果 404，嘗試更換模型名稱。
+            // 使用最新的 v1beta 介面
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
             
             try {
@@ -67,14 +69,16 @@
                 });
                 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }));
+                    const errorData = await response.json().catch(() => ({ error: { message: "無法解析錯誤訊息" } }));
                     const status = response.status;
                     let msg = errorData.error?.message || "請求失敗";
                     
                     if (status === 404) {
-                        throw new Error(`404: 找不到模型 '${modelName}'。這通常是因為該模型在您的區域不適用，或者名稱輸入錯誤。請嘗試更換為 'gemini-1.5-pro' 或 'gemini-1.0-pro'。`);
+                        throw new Error(`404: 找不到模型 '${modelName}'。您的金鑰可能不支援舊版模型。推薦更換為 'gemini-1.5-flash'。`);
                     } else if (status === 401) {
-                        throw new Error(`401: API Key 無效或未授權。請重新檢查代碼頂部的 apiKey 變數。`);
+                        throw new Error(`401: API Key 無效。請檢查程式碼頂部的 apiKey 變數是否填寫正確。`);
+                    } else if (status === 400) {
+                        throw new Error(`400: 請求格式錯誤。請確認決策內容是否包含特殊字元。`);
                     } else {
                         throw new Error(`${status}: ${msg}`);
                     }
@@ -82,7 +86,7 @@
                 
                 const result = await response.json();
                 const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw new Error('AI 返回內容為空，可能是觸發了安全過濾器。');
+                if (!text) throw new Error('AI 回傳內容為空，可能是因為輸入內容過於敏感被安全過濾器攔截。');
                 return text;
             } catch (error) {
                 throw error;
@@ -122,7 +126,6 @@
                             <polyline points="14 2 14 8 20 8"/>
                         </Fragment>
                     );
-                    case 'settings': return <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.72V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.17a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />;
                     default: return <circle cx="12" cy="12" r="10" />;
                 }
             };
@@ -140,7 +143,7 @@
                 <div className="relative border-l-2 border-slate-200 ml-4 space-y-12">
                     {[
                         { stage: "階段一：MVP 基礎", focus: "直覺捕捉與邏輯檢核", desc: "建立決策捕捉介面，串接啟發法與偏誤提醒。已完成核心 UI。", icon: "brain", status: "Done" },
-                        { stage: "階段二：AI 模擬核心", focus: "系統三模擬艙 (Gemini)", desc: "整合 Gemini 1.5 模型，自動生成高品質未來劇本。支援手動更換模型 ID。", icon: "sparkles", status: "Running" },
+                        { stage: "階段二：AI 模擬核心", focus: "系統三模擬艙 (Gemini)", desc: "整合 Gemini 1.5 模型，自動生成高品質未來劇本。支援手動與推薦模型切換。", icon: "sparkles", status: "Running" },
                         { stage: "階段三：環境助推", focus: "執行力 Nudge 引擎", desc: "開發環境設置建議，整合手機提醒，確保持續執行決策。", icon: "check", status: "Next" }
                     ].map((item, i) => (
                         <div key={i} className="relative pl-10">
@@ -203,13 +206,13 @@
                     <div className="pl-4">
                         <p className="font-bold text-slate-500 mb-2 text-xs uppercase tracking-widest">系統三感官模擬劇本</p>
                         <div className="italic bg-indigo-50 p-6 rounded-2xl text-indigo-900 leading-relaxed whitespace-pre-wrap text-sm shadow-inner min-h-[100px]">
-                            {data.futureScript || "⚠️ 您尚未在互動原型第三步中生成 AI 模擬劇本。"}
+                            {data.futureScript || "⚠️ 您尚未在原型中啟動 AI 模擬。"}
                         </div>
                     </div>
                 </section>
 
                 <div className="mt-20 pt-8 border-t border-slate-100 text-center text-slate-400 text-[10px] tracking-widest uppercase">
-                    <p>依據丹尼爾·卡尼曼與 Milena Stepanova 之理論開發 • 驅動力由系統三奠定</p>
+                    <p>依據認知科學理論開發 • 確保決策不僅具理智且具持久動力</p>
                 </div>
             </div>
         );
@@ -259,10 +262,10 @@
                             <div className="flex items-center gap-2 text-orange-500 mb-2 font-bold uppercase tracking-widest text-xs">
                                 <Icon name="brain" className="w-4 h-4" /> Step 1: System 1 Audit
                             </div>
-                            <h2 className="text-3xl font-extrabold mb-6 leading-tight">先別分析，<br/>你的<span className="text-indigo-600">第一直覺</span>是？</h2>
+                            <h2 className="text-3xl font-extrabold mb-6 leading-tight">先別分析，你的<span className="text-indigo-600">直覺</span>是？</h2>
                             <textarea 
                                 className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] h-44 outline-none focus:border-indigo-500 transition-all text-lg shadow-inner"
-                                placeholder="例如：我想把存款全部投入這次的新型投資計畫..."
+                                placeholder="例如：我想把所有存款投入這次的新型投資計畫..."
                                 value={data.decision}
                                 onChange={(e) => setData({...data, decision: e.target.value})}
                             />
@@ -321,25 +324,36 @@
                                         {aiError && (
                                             <div className="p-5 bg-red-50 border border-red-100 rounded-3xl text-red-600 space-y-3">
                                                 <div className="flex items-center gap-2 font-bold text-sm">
-                                                    <Icon name="alert" className="w-4 h-4" /> 發生錯誤
+                                                    <Icon name="alert" className="w-4 h-4" /> 出現問題了
                                                 </div>
                                                 <p className="text-xs leading-relaxed">{aiError}</p>
                                                 
                                                 <div className="pt-2 border-t border-red-100">
-                                                    <label className="block text-[10px] uppercase font-bold text-red-400 mb-2 tracking-widest">嘗試更換模型名稱 (Model ID):</label>
-                                                    <div className="flex gap-2">
+                                                    <label className="block text-[10px] uppercase font-bold text-red-400 mb-2 tracking-widest">請嘗試切換至下方穩定模型：</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'].map(m => (
+                                                            <button 
+                                                                key={m}
+                                                                onClick={() => { setSelectedModel(m); handleAiGeneration(); }}
+                                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${selectedModel === m ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200 hover:bg-red-50'}`}
+                                                            >
+                                                                {m}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-3 flex gap-2">
                                                         <input 
                                                             type="text" 
-                                                            className="flex-1 px-3 py-2 bg-white border border-red-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-red-300"
+                                                            className="flex-1 px-3 py-2 bg-white border border-red-200 rounded-xl text-xs outline-none"
                                                             value={selectedModel}
                                                             onChange={(e) => setSelectedModel(e.target.value)}
-                                                            placeholder="如: gemini-1.5-pro"
+                                                            placeholder="手動輸入 Model ID"
                                                         />
                                                         <button 
                                                             onClick={handleAiGeneration}
-                                                            className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700"
+                                                            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
                                                         >
-                                                            重試
+                                                            手動重試
                                                         </button>
                                                     </div>
                                                 </div>
@@ -369,7 +383,7 @@
                             {!data.futureScript && (
                                 <div className="mb-8 p-4 bg-orange-50 rounded-2xl text-orange-700 text-sm flex items-center gap-3">
                                     <Icon name="alert" className="w-5 h-5 shrink-0" />
-                                    <p>建議回上一步生成 AI 劇本，報告內容才會包含「情感動力」分析喔！</p>
+                                    <p>建議回上一步生成 AI 劇本，報告內容才會完整喔！</p>
                                 </div>
                             )}
                             <p className="text-slate-500 mb-10 max-w-sm mx-auto font-medium text-sm leading-relaxed">您的分析報告已整合「直覺、邏輯與情感」。點擊下方按鈕可下載 PDF。</p>
@@ -402,7 +416,7 @@
                                         {renderFlow()}
                                         {step < 4 && (
                                             <div className="mt-12 flex justify-between items-center pt-8 border-t border-slate-50">
-                                                <button onClick={() => setStep(s => s - 1)} disabled={step === 1} className={`font-bold flex items-center gap-1 ${step === 1 ? 'text-slate-200' : 'text-slate-400 hover:text-slate-600 transition-colors'}`}>
+                                                <button onClick={() => setStep(s => s - 1)} disabled={step === 1} className={`font-bold flex items-center gap-1 ${step === 1 ? 'text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
                                                     <Icon name="chevronLeft" className="w-5 h-5" /> 上一步
                                                 </button>
                                                 <button onClick={() => setStep(s => s + 1)} className="bg-slate-900 text-white px-10 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-black transition-all">
