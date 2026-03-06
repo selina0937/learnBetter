@@ -46,14 +46,15 @@
             
             要求：1.包含具體感官細節(光線、聲音、氣味) 2.描述成功後的情感滿足 3.語氣溫暖具啟發性。請直接輸出劇本內容，不要有前言。`;
 
-            // --- 暴力排除 404：全自動連鎖嘗試清單 ---
+            // --- 針對 2.5-flash 優化：全自動連鎖嘗試清單 ---
+            // 根據您的查詢結果，優先嘗試 gemini-2.5-flash
             const trials = [
+                { ver: 'v1beta', mod: 'gemini-2.5-flash-preview-09-2025' },
+                { ver: 'v1beta', mod: 'gemini-2.5-flash' },
+                { ver: 'v1', mod: 'gemini-2.5-flash' },
                 { ver: 'v1beta', mod: 'gemini-1.5-flash' },
                 { ver: 'v1', mod: 'gemini-1.5-flash' },
-                { ver: 'v1beta', mod: 'gemini-1.5-flash-latest' },
-                { ver: 'v1', mod: 'gemini-1.5-flash-latest' },
-                { ver: 'v1beta', mod: 'gemini-1.5-pro' },
-                { ver: 'v1', mod: 'gemini-1.5-pro' }
+                { ver: 'v1beta', mod: 'gemini-1.5-pro' }
             ];
 
             let lastErr = null;
@@ -61,7 +62,7 @@
 
             for (let trial of trials) {
                 const url = `https://generativelanguage.googleapis.com/${trial.ver}/models/${trial.mod}:generateContent?key=${currentKey}`;
-                attemptedPaths.push(`${trial.ver}/models/${trial.mod}`);
+                attemptedPaths.push(`${trial.ver}/${trial.mod}`);
                 
                 try {
                     const response = await fetch(url, {
@@ -76,7 +77,6 @@
                         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                         if (text) return text;
                     } else {
-                        // 記錄錯誤但繼續嘗試下一個組合
                         lastErr = { 
                             status: response.status, 
                             msg: data.error?.message || "伺服器無回應",
@@ -88,7 +88,6 @@
                 }
             }
 
-            // 如果全部失敗才拋出最後一個錯誤
             throw lastErr;
         }
 
@@ -107,7 +106,7 @@
                     case 'key': return <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3L15.5 7.5z"/>;
                     case 'chevronRight': return <polyline points="9 18 15 12 9 6" />;
                     case 'chevronLeft': return <polyline points="15 18 9 12 15 6" />;
-                    case 'info': return <g><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></g>;
+                    case 'info': return <g><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></g>;
                     default: return <circle cx="12" cy="12" r="10" />;
                 }
             };
@@ -123,10 +122,10 @@
             return (
                 <div className="fade-in space-y-8">
                     <h2 className="text-3xl font-extrabold text-indigo-900 text-center tracking-tighter">實施路徑圖</h2>
-                    <div className="space-y-6">
+                    <div className="space-y-6 text-left">
                         {[
                             { title: "階段一：MVP 基礎建設", desc: "完成核心 UI、系統一/二檢查清單與 PDF 報告功能。" },
-                            { title: "階段二：AI 核心整合 (當前)", desc: "整合自動路徑偵測機制，解決 404 與金鑰外洩防禦。" },
+                            { title: "階段二：AI 2.5-Flash 整合 (當前)", desc: "升級至 Gemini 2.5 模型，提供更精準的情感模擬與更快的響應。" },
                             { title: "階段三：智慧助推與行動", desc: "根據決策內容自動提供環境設置建議與持續執行機制。" }
                         ].map((stage, idx) => (
                             <div key={idx} className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
@@ -146,10 +145,10 @@
         function PrintableReport({ data }) {
             return (
                 <div className="p-12 bg-white text-slate-900 border border-slate-200 rounded-lg max-w-4xl mx-auto report-card text-left">
-                    <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-6 mb-8">
+                    <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-6 mb-8 text-left">
                         <div>
                             <h1 className="text-3xl font-bold text-indigo-900 mb-1 font-inter uppercase tracking-tight">Cognitive Audit Report</h1>
-                            <p className="text-slate-500 text-sm italic font-medium">COGNAV 三系統決策導航分析報告</p>
+                            <p className="text-slate-500 text-sm italic font-medium">COGNAV 三系統決策導航分析報告 • Powered by Gemini 2.5</p>
                         </div>
                         <div className="text-right text-xs font-bold text-slate-400">
                             <p>生成日期：{new Date().toLocaleDateString()}</p>
@@ -179,7 +178,7 @@
                         </section>
                     </div>
                     <div className="mt-20 pt-8 border-t border-slate-100 text-center text-slate-400 text-[10px] tracking-widest uppercase font-bold">
-                        <p>Powered by COGNAV Decision Support Engine</p>
+                        <p>Powered by COGNAV Decision Support Engine • Based on Dual Process Theory</p>
                     </div>
                 </div>
             );
@@ -235,19 +234,19 @@
                                     <button onClick={() => setView('flow')} className={`px-6 py-2 rounded-xl font-bold transition-all ${view === 'flow' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>互動原型</button>
                                     <button onClick={() => setView('roadmap')} className={`px-6 py-2 rounded-xl font-bold transition-all ${view === 'roadmap' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>實施路徑</button>
                                 </div>
-                                <button onClick={() => setShowKeyModal(true)} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all flex items-center gap-2">
+                                <button onClick={() => setShowKeyModal(true)} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all">
                                     <Icon name="settings" className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* 主要內容卡片 */}
-                            <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 p-10 md:p-14 min-h-[550px] flex flex-col justify-between overflow-hidden relative">
+                            <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 p-10 md:p-14 min-h-[550px] flex flex-col justify-between overflow-hidden relative text-left">
                                 {view === 'flow' ? (
                                     <Fragment>
                                         {step === 1 && (
                                             <div className="fade-in">
                                                 <h2 className="text-3xl font-extrabold mb-6 text-indigo-900 tracking-tighter text-left">捕捉<span className="text-indigo-600">直覺</span></h2>
-                                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed">在理智與數據分析介入之前，寫下大腦最初始、最真實的想法。</p>
+                                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed">在理智介入之前，寫下大腦最初始的想法。</p>
                                                 <textarea className="w-full p-6 bg-slate-50 border-2 rounded-3xl h-44 outline-none focus:border-indigo-500 font-medium text-lg shadow-inner" placeholder="例如：我想辭職去創業..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
                                             </div>
                                         )}
@@ -271,7 +270,7 @@
                                                     <Fragment>
                                                         <button onClick={handleAiGeneration} disabled={isAiLoading} className="w-full py-10 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:bg-indigo-100 transition-all text-indigo-600 font-bold group">
                                                             {isAiLoading ? (
-                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在自動偵測並適配模型路徑...</span></div>
+                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在透過 Gemini 2.5 生成劇本...</span></div>
                                                             ) : (
                                                                 <Fragment><Icon name="sparkles" className="w-10 h-10 group-hover:scale-110 transition-transform" /><span>啟動 AI 感官劇本生成</span></Fragment>
                                                             )}
@@ -282,10 +281,10 @@
                                                                 <p className="mb-2 font-mono bg-white/50 p-3 rounded-xl border border-red-100 leading-relaxed break-all">{aiError.msg}</p>
                                                                 <div className="flex items-center gap-2 opacity-70 italic mb-2">
                                                                     <Icon name="info" className="w-3 h-3" />
-                                                                    <span>嘗試過的組合：{aiError.tried}</span>
+                                                                    <span>嘗試路徑：{aiError.tried}</span>
                                                                 </div>
-                                                                <p className="font-bold text-red-800">重要提示：</p>
-                                                                <p className="mt-1">如果您位於香港或特定限制區域，Google API 可能會持續回傳 404。請嘗試使用 VPN 並將節點設為「台灣」或「美國」。</p>
+                                                                <p className="font-bold text-red-800">提示：</p>
+                                                                <p className="mt-1">請確認您的 API Key 權限。目前系統優先尋找 2.5-Flash 模型。</p>
                                                             </div>
                                                         )}
                                                     </Fragment>
@@ -338,7 +337,7 @@
                                     <h3 className="text-2xl font-extrabold tracking-tight">API 安全設定</h3>
                                 </div>
                                 <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed">
-                                    為了安全保護金鑰，請在下方填入您的新 Gemini API Key。金鑰僅存在本機分頁的 Session 中，**不會被上傳到 GitHub 或任何伺服器**。
+                                    請填入支援 <b>Gemini 2.5-Flash</b> 的 API Key。金鑰僅存在本機分頁的 Session 中，不會上傳。
                                 </p>
                                 <input 
                                     type="password" 
