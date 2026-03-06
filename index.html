@@ -33,59 +33,63 @@
 
         // --- 安全機制：金鑰管理 ---
         const getStoredKey = () => sessionStorage.getItem('COGNAV_API_KEY') || "";
-        const saveKeyToStorage = (key) => sessionStorage.setItem('COGNAV_API_KEY', key.trim());
+        const saveKeyToStorage = (key) => sessionStorage.setItem('COGNAV_API_KEY', key.trim().replace(/\s/g, ''));
 
-        async function fetchGeminiAI(userDecision, checks, alias) {
+        async function fetchGeminiAI(userDecision, checks) {
             const currentKey = getStoredKey().trim();
             if (!currentKey) throw { status: "Auth", msg: "請先點擊設定輸入 API Key。" };
 
-            // 針對 v1 端點，使用目前最穩定的模型名稱
-            const modelId = alias === 'gemini-pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
-            
-            // 系統指令與使用者內容合併 (提高相容性)
             const prompt = `你是認知科學專家。請針對以下決策生成約 300 字、感官豐富的未來模擬劇本。
             
             決策內容：『${userDecision}』
             已通過檢核：${checks.filter(c => c.checked).map(c => c.text).join('、') || '無'}
             
-            要求：1.包含細緻感官描述(光線、聲音、氣味) 2.描述成功後的情感滿足 3.語氣溫暖具啟發性。請直接輸出劇本內容，不要有前言。`;
+            要求：1.包含具體感官細節(光線、聲音、氣味) 2.描述成功後的情感滿足 3.語氣溫暖具啟發性。請直接輸出劇本內容，不要有前言。`;
 
-            // 切換至 v1 穩定端點，這通常能解決 v1beta 的 404 問題
-            const url = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${currentKey}`;
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
+            // --- 暴力排除 404：全自動連鎖嘗試清單 ---
+            const trials = [
+                { ver: 'v1beta', mod: 'gemini-1.5-flash' },
+                { ver: 'v1', mod: 'gemini-1.5-flash' },
+                { ver: 'v1beta', mod: 'gemini-1.5-flash-latest' },
+                { ver: 'v1', mod: 'gemini-1.5-flash-latest' },
+                { ver: 'v1beta', mod: 'gemini-1.5-pro' },
+                { ver: 'v1', mod: 'gemini-1.5-pro' }
+            ];
 
-                const data = await response.json();
-                if (!response.ok) {
-                    throw { 
-                        status: response.status, 
-                        msg: data.error?.message || "伺服器無回應",
-                        details: `Path: v1/models/${modelId}`,
-                        raw: data
-                    };
-                }
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw { status: "Empty", msg: "AI 沒有回傳文字，可能觸發了安全過濾器。" };
-                return text;
-            } catch (e) {
-                // 如果 v1 依然 404，嘗試最後一次備援 v1beta
-                if (e.status === 404) {
-                    const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${currentKey}`;
-                    const res2 = await fetch(betaUrl, {
+            let lastErr = null;
+            let attemptedPaths = [];
+
+            for (let trial of trials) {
+                const url = `https://generativelanguage.googleapis.com/${trial.ver}/models/${trial.mod}:generateContent?key=${currentKey}`;
+                attemptedPaths.push(`${trial.ver}/models/${trial.mod}`);
+                
+                try {
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
-                    const data2 = await res2.json();
-                    if (res2.ok) return data2.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (text) return text;
+                    } else {
+                        // 記錄錯誤但繼續嘗試下一個組合
+                        lastErr = { 
+                            status: response.status, 
+                            msg: data.error?.message || "伺服器無回應",
+                            tried: attemptedPaths.join(' -> ')
+                        };
+                    }
+                } catch (e) {
+                    lastErr = { status: "FetchError", msg: e.message, tried: attemptedPaths.join(' -> ') };
                 }
-                throw e;
             }
+
+            // 如果全部失敗才拋出最後一個錯誤
+            throw lastErr;
         }
 
         // --- 組件：圖標渲染 ---
@@ -122,7 +126,7 @@
                     <div className="space-y-6">
                         {[
                             { title: "階段一：MVP 基礎建設", desc: "完成核心 UI、系統一/二檢查清單與 PDF 報告功能。" },
-                            { title: "階段二：AI 核心整合 (當前)", desc: "整合穩定版 v1 API 與自動適配機制，解決 404 報錯問題。" },
+                            { title: "階段二：AI 核心整合 (當前)", desc: "整合自動路徑偵測機制，解決 404 與金鑰外洩防禦。" },
                             { title: "階段三：智慧助推與行動", desc: "根據決策內容自動提供環境設置建議與持續執行機制。" }
                         ].map((stage, idx) => (
                             <div key={idx} className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
@@ -213,7 +217,7 @@
                 if (!data.decision) return;
                 setIsAiLoading(true); setAiError(null);
                 try {
-                    const text = await fetchGeminiAI(data.decision, data.system2Checks, 'gemini-flash');
+                    const text = await fetchGeminiAI(data.decision, data.system2Checks);
                     setData(prev => ({...prev, futureScript: text}));
                 } catch (e) { 
                     setAiError(e); 
@@ -267,7 +271,7 @@
                                                     <Fragment>
                                                         <button onClick={handleAiGeneration} disabled={isAiLoading} className="w-full py-10 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:bg-indigo-100 transition-all text-indigo-600 font-bold group">
                                                             {isAiLoading ? (
-                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在透過 v1 穩定路徑生成劇本...</span></div>
+                                                                <div className="flex flex-col items-center gap-3"><div className="loading-spinner"></div><span className="animate-pulse">正在自動偵測並適配模型路徑...</span></div>
                                                             ) : (
                                                                 <Fragment><Icon name="sparkles" className="w-10 h-10 group-hover:scale-110 transition-transform" /><span>啟動 AI 感官劇本生成</span></Fragment>
                                                             )}
@@ -276,10 +280,12 @@
                                                             <div className="mt-6 p-6 bg-red-50 border border-red-100 rounded-3xl text-red-600 text-xs text-left">
                                                                 <p className="font-bold mb-2 flex items-center gap-2 uppercase tracking-widest text-sm"><Icon name="alert" className="w-4 h-4"/> 錯誤排除資訊 ({aiError.status})</p>
                                                                 <p className="mb-2 font-mono bg-white/50 p-3 rounded-xl border border-red-100 leading-relaxed break-all">{aiError.msg}</p>
-                                                                <div className="flex items-center gap-2 opacity-70 italic">
+                                                                <div className="flex items-center gap-2 opacity-70 italic mb-2">
                                                                     <Icon name="info" className="w-3 h-3" />
-                                                                    <span>診斷資訊：{aiError.details}</span>
+                                                                    <span>嘗試過的組合：{aiError.tried}</span>
                                                                 </div>
+                                                                <p className="font-bold text-red-800">重要提示：</p>
+                                                                <p className="mt-1">如果您位於香港或特定限制區域，Google API 可能會持續回傳 404。請嘗試使用 VPN 並將節點設為「台灣」或「美國」。</p>
                                                             </div>
                                                         )}
                                                     </Fragment>
