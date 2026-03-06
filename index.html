@@ -36,7 +36,7 @@
         const { useState, useEffect, Fragment } = React;
 
         // --- Gemini API 串接邏輯 ---
-        const apiKey = ""; // 請在此填入您的 API Key
+        const apiKey = "AIzaSyD-0UEeZYRsesGJz9FuNJn4hL9TQqK_9Ok"; // 請在此填入您的 API Key
         
         async function generateFutureScript(userDecision, checks, modelName = "gemini-1.5-flash") {
             const activeChecks = checks.filter(c => c.checked).map(c => c.text).join('、');
