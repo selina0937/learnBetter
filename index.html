@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>COGNAV Pro - 專業三系統決策審計系統</title>
-    <!-- 引入外部 CDN 資源 -->
+    <!-- 載入外部資源 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -23,15 +23,15 @@
         }
 
         .glass-card {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
-        .fade-in { animation: fadeIn 0.4s ease-out; }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 列印專用樣式 */
+        /* 列印優化 */
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
@@ -40,9 +40,10 @@
         }
         .print-only { display: none; }
 
+        /* 加載動畫 */
         .loader {
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             border: 3px solid #e2e8f0;
             border-bottom-color: var(--brand-primary);
             border-radius: 50%;
@@ -50,8 +51,6 @@
             animation: rotation 1s linear infinite;
         }
         @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .pricing-glow { box-shadow: 0 20px 50px -12px rgba(79, 70, 229, 0.25); }
     </style>
 </head>
 <body class="min-h-screen text-slate-900">
@@ -60,8 +59,7 @@
     <script type="text/babel">
         const { useState, useEffect, Fragment } = React;
 
-        // --- 1. 子組件定義 (需在 App 之前定義) ---
-
+        // --- 子組件：圖標渲染 (修正 JSX 相鄰元素問題) ---
         function Icon({ name, className = "w-6 h-6" }) {
             const paths = {
                 brain: <path d="M12 2a5 5 0 0 1 5 5c0 1.25-.46 2.39-1.21 3.26A5 5 0 0 1 12 19a5 5 0 0 1-3.79-8.74A5 5 0 0 1 7 7a5 5 0 0 1 5-5zM9 7.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM15 7.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" />,
@@ -73,8 +71,8 @@
                 crown: <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />,
                 chevronRight: <polyline points="9 18 15 12 9 6" />,
                 chevronLeft: <polyline points="15 18 9 12 15 6" />,
-                shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
-                tag: <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                coins: <g><circle cx="8" cy="8" r="6"/><circle cx="16" cy="16" r="6"/><path d="M12 8v8M8 12h8"/></g>,
+                shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -83,17 +81,18 @@
             );
         }
 
+        // --- 子組件：專業列印報告 ---
         function PrintableReport({ data }) {
             return (
                 <div className="p-16 bg-white text-slate-900 report-card min-h-screen border-t-8 border-indigo-600 text-left">
                     <div className="flex justify-between items-start mb-12 border-b pb-8">
                         <div>
-                            <h1 className="text-4xl font-extrabold text-indigo-950 mb-2 tracking-tight">Decision Audit Executive Summary</h1>
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">COGNAV Pro - 三系統決策審計報告</p>
+                            <h1 className="text-4xl font-extrabold text-indigo-950 mb-2 tracking-tight uppercase">Cognitive Audit Executive Summary</h1>
+                            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm font-inter">COGNAV Pro Decision Engine • Secure Proxy v4.5</p>
                         </div>
                         <div className="text-right text-xs text-slate-400 font-bold uppercase">
                             <p>Serial: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
-                            <p>Generated: {new Date().toLocaleDateString()}</p>
+                            <p>Date: {new Date().toLocaleDateString()}</p>
                         </div>
                     </div>
                     <div className="space-y-12">
@@ -102,41 +101,39 @@
                             <div className="bg-slate-50 p-6 rounded-2xl text-xl font-medium border-l-4 border-orange-500 italic">"{data.decision || "N/A"}"</div>
                         </section>
                         <section>
-                            <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em] mb-4">Phase 2: Logical Verification</h3>
-                            <div className="grid grid-cols-1 gap-3 pl-2">
-                                {data.system2Checks.map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3 text-sm font-bold text-slate-700">
-                                        <span className={item.checked ? "text-emerald-500" : "text-slate-300"}>{item.checked ? "✓ [Verified]" : "✗ [Pending]"}</span>
-                                        <span>{item.text}</span>
+                            <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em] mb-4">Phase 2: Logical Matrix Audit</h3>
+                            <div className="grid grid-cols-2 gap-6 pl-2">
+                                {Object.entries(data.matrix).map(([key, val]) => (
+                                    <div key={key} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-2">{key}</p>
+                                        <p className="text-sm font-bold text-slate-700">{val || "未填寫"}</p>
                                     </div>
                                 ))}
                             </div>
                         </section>
                         <section>
-                            <h3 className="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4">Phase 3: Visual Simulation</h3>
+                            <h3 className="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4">Phase 3: Visual & Sensory Simulation</h3>
                             <div className="bg-indigo-50 p-8 rounded-3xl text-indigo-950 leading-relaxed whitespace-pre-wrap font-medium border border-indigo-100 italic shadow-inner">
                                 {data.futureScript || "Simulation not executed."}
                             </div>
                         </section>
                         <section>
-                            <h3 className="text-xs font-black text-emerald-500 uppercase tracking-[0.2em] mb-4">Phase 4: Behavioral Nudges</h3>
+                            <h3 className="text-xs font-black text-emerald-500 uppercase tracking-[0.2em] mb-4">Phase 4: Implementation Nudges</h3>
                             <div className="bg-emerald-50/50 p-8 rounded-3xl text-emerald-950 leading-relaxed whitespace-pre-wrap font-bold border border-emerald-100">
-                                {data.nudges || "Action plan not generated."}
+                                {data.nudges || "Action plan pending."}
                             </div>
                         </section>
                     </div>
-                    <div className="mt-20 pt-10 border-t flex justify-between items-end">
-                        <div className="text-[10px] text-slate-300 font-bold uppercase">© 2024 COGNAV Labs. Secure SaaS Architecture.</div>
+                    <div className="mt-20 pt-10 border-t flex justify-between items-end opacity-40">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">© 2024 COGNAV LABS. ALL AUDITS ARE CONFIDENTIAL AND SECURED.</div>
                     </div>
                 </div>
             );
         }
 
-        // --- 2. 核心通訊函數 ---
-
+        // --- 核心通訊函數 ---
         async function fetchAI(prompt, type) {
             try {
-                // 這是你 Vercel 上的後端路徑
                 const response = await fetch('/api/cognav', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -145,7 +142,7 @@
 
                 if (!response.ok) {
                     const errData = await response.json().catch(() => ({ error: "伺服器通訊異常" }));
-                    throw new Error(errData.error || "伺服器通訊異常");
+                    throw new Error(errData.error || "點數不足或系統錯誤");
                 }
 
                 const data = await response.json();
@@ -155,244 +152,139 @@
             }
         }
 
-        // --- 3. 主應用組件 ---
-
+        // --- 主應用組件 ---
         function App() {
             const [view, setView] = useState('audit'); 
             const [step, setStep] = useState(1);
             const [isAiLoading, setIsAiLoading] = useState(false);
             const [aiError, setAiError] = useState(null);
+            
             const [data, setData] = useState({
                 decision: '',
-                system2Checks: [
-                    { text: "我已經檢查過過去五年的數據基準。", checked: false },
-                    { text: "我徵詢過三位反對者的真實意見。", checked: false },
-                    { text: "我能承受失敗後產生的具體後果。", checked: false }
-                ],
+                matrix: {
+                    preMortem: '',
+                    baseRate: '',
+                    externalView: '',
+                    secondOrder: ''
+                },
                 futureScript: '',
                 nudges: ''
             });
 
+            // 進入 Step 4 自動生成助推建議
             useEffect(() => {
                 if (step === 4 && !data.nudges && data.futureScript) {
                     generateNudges();
                 }
-            }, [step, data.futureScript]);
+            }, [step]);
 
             const generateFutureScript = async () => {
                 if (!data.decision) return;
                 setIsAiLoading(true); setAiError(null);
                 try {
-                    const prompt = `你是認知科學專家。針對決策：『${data.decision}』，生成一段 300 字、感官豐富的未來成功模擬劇本。直接輸出內容。`;
+                    // 強化 Prompt 解決字數太短問題
+                    const prompt = `你是認知科學專家。針對決策：『${data.decision}』。
+                    請寫一段約 500 字感官豐富的未來成功模擬劇本。要求：
+                    1. 描述一年後成功的具體環境細節(光線、聲音、氣味)。
+                    2. 描述達成目標後，與家人/團隊的對話與強烈的情感滿足感。
+                    3. 描述你現在的身分認同(Identity)如何與理想對齊。
+                    直接輸出劇本內容，不要有任何前言。`;
                     const text = await fetchAI(prompt, "script");
                     setData(prev => ({...prev, futureScript: text}));
-                } catch (e) { setAiError(e); } 
+                } catch (e) { setAiError(e.msg); } 
                 finally { setIsAiLoading(false); }
             };
 
             const generateNudges = async () => {
                 setIsAiLoading(true);
                 try {
-                    const prompt = `你是行為經濟學家。根據決策：『${data.decision}』與願景劇本：『${data.futureScript}』，設計 3 個環境助推（Nudge）方案：1. 負向行為摩擦 2. 正向助推 3. 視覺錨點提示。直接條列輸出。`;
+                    const prompt = `你是行為經濟學家。根據決策：『${data.decision}』與審計矩陣：${JSON.stringify(data.matrix)}。設計 3 個環境助推(Nudge)方案，減少執行阻礙。請條列輸出具體做法。`;
                     const text = await fetchAI(prompt, "nudge");
                     setData(prev => ({...prev, nudges: text}));
-                } catch (e) { console.error("Nudge error:", e); }
+                } catch (e) { console.error(e); }
                 finally { setIsAiLoading(false); }
             };
 
             return (
-                <div className="min-h-screen pb-12 selection:bg-indigo-100">
+                <div className="min-h-screen pb-20 selection:bg-indigo-100">
                     {/* Navbar */}
                     <nav className="no-print w-full px-8 py-4 flex justify-between items-center glass-card sticky top-0 z-50">
-                        <div className="flex items-center gap-2 cursor-pointer group" onClick={()=>setView('audit')}>
-                            <div className="bg-indigo-600 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
+                        <div className="flex items-center gap-3 cursor-pointer group" onClick={()=>setView('audit')}>
+                            <div className="bg-indigo-600 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-all">
                                 <Icon name="compass" className="w-5 h-5" />
                             </div>
                             <span className="font-extrabold text-2xl tracking-tighter">COGNAV <span className="text-indigo-600 text-sm uppercase">Pro</span></span>
                         </div>
-                        <div className="flex items-center gap-4 md:gap-10">
-                            <button onClick={()=>setView('audit')} className={`text-xs font-black uppercase tracking-widest transition-all ${view === 'audit' ? 'text-indigo-600 border-b-2 border-indigo-600 pb-1' : 'text-slate-400 hover:text-slate-600'}`}>審計核心</button>
-                            <button onClick={()=>setView('roadmap')} className={`text-xs font-black uppercase tracking-widest transition-all ${view === 'roadmap' ? 'text-indigo-600 border-b-2 border-indigo-600 pb-1' : 'text-slate-400 hover:text-slate-600'}`}>產品路徑</button>
-                            <button onClick={()=>setView('pricing')} className="px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-indigo-100 flex items-center gap-2">
-                                <Icon name="crown" className="w-3.5 h-3.5" /> Upgrade
+                        <div className="flex items-center gap-2 md:gap-10">
+                            <button onClick={()=>setView('audit')} className={`text-xs font-black uppercase tracking-widest transition-all ${view === 'audit' ? 'text-indigo-600 border-b-2 border-indigo-600 pb-1' : 'text-slate-400 hover:text-slate-600'}`}>決策審計</button>
+                            <button onClick={()=>setView('pricing')} className="px-5 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-xl shadow-slate-200">
+                                <Icon name="coins" className="w-3.5 h-3.5" /> Credits：10
                             </button>
                         </div>
                     </nav>
 
-                    <main className="no-print max-w-4xl mx-auto py-12 px-6">
+                    <main className="no-print max-w-5xl mx-auto py-12 px-6">
                         {view === 'audit' && (
-                            <div className="bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/60 border border-white p-8 md:p-16 min-h-[600px] flex flex-col justify-between fade-in relative overflow-hidden text-left">
+                            <div className="bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/60 border border-white p-8 md:p-16 min-h-[650px] flex flex-col justify-between fade-in relative overflow-hidden text-left">
                                 <div className="relative z-10">
                                     {step === 1 && (
                                         <div className="fade-in">
                                             <div className="flex items-center gap-3 text-orange-500 mb-8 font-black uppercase tracking-widest text-xs"><Icon name="brain" className="w-4 h-4" /> System 1 Baseline</div>
-                                            <h2 className="text-4xl font-extrabold mb-4 tracking-tighter text-slate-900 leading-tight">捕捉直覺</h2>
-                                            <p className="text-slate-500 mb-10 font-medium text-lg">在數據與邏輯介入前，寫下大腦最初始的想法。不必過濾，真實就好。</p>
-                                            <textarea className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] h-56 outline-none focus:border-indigo-500 font-medium text-xl shadow-inner transition-all focus:bg-white" placeholder="例如：我想辭職去創業..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
+                                            <h2 className="text-4xl font-extrabold mb-4 tracking-tighter text-slate-900 leading-tight">捕捉原始直覺</h2>
+                                            <p className="text-slate-500 mb-10 font-medium text-lg">在理智介入前，寫下大腦最初始的想法。不必過濾，真實就好。</p>
+                                            <textarea className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] h-56 outline-none focus:border-indigo-500 font-medium text-xl shadow-inner transition-all focus:bg-white" placeholder="例如：我想在現在買入這間預售屋..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
                                         </div>
                                     )}
+
                                     {step === 2 && (
                                         <div className="fade-in">
                                             <div className="flex items-center gap-3 text-blue-500 mb-8 font-black uppercase tracking-widest text-xs"><Icon name="check" className="w-4 h-4" /> System 2 Verification</div>
-                                            <h2 className="text-4xl font-extrabold mb-10 tracking-tighter text-slate-900">邏輯風險審計</h2>
-                                            <div className="space-y-4">
-                                                {data.system2Checks.map((item, i) => (
-                                                    <div key={i} onClick={() => {
-                                                        const n = [...data.system2Checks];
-                                                        n[i].checked = !n[i].checked;
-                                                        setData({...data, system2Checks: n});
-                                                    }} className={`p-6 rounded-[2rem] border-2 flex items-center gap-6 cursor-pointer transition-all ${item.checked ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
-                                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${item.checked ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-300'}`}><Icon name="check" className="w-5 h-5" /></div>
-                                                        <span className={`text-lg font-bold ${item.checked ? 'text-indigo-950 opacity-40 line-through' : 'text-slate-700'}`}>{item.text}</span>
-                                                    </div>
-                                                ))}
+                                            <h2 className="text-4xl font-extrabold mb-10 tracking-tighter text-slate-900 font-inter leading-tight">深度邏輯審計矩陣</h2>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">事前驗屍法 (Pre-mortem)</label>
+                                                    <textarea className="w-full p-5 bg-slate-50 border-2 rounded-3xl h-32 text-sm font-medium focus:border-indigo-500 outline-none transition-all" placeholder="想像一年後失敗了，死因可能是什麼？" value={data.matrix.preMortem} onChange={(e)=>setData({...data, matrix:{...data.matrix, preMortem: e.target.value}})} />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black uppercase text-blue-500 tracking-widest">基礎比率 (Base Rate)</label>
+                                                    <textarea className="w-full p-5 bg-slate-50 border-2 rounded-3xl h-32 text-sm font-medium focus:border-indigo-500 outline-none transition-all" placeholder="類似決策在市場上的統計成功率是多少？" value={data.matrix.baseRate} onChange={(e)=>setData({...data, matrix:{...data.matrix, baseRate: e.target.value}})} />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black uppercase text-orange-500 tracking-widest">外部視角 (External View)</label>
+                                                    <textarea className="w-full p-5 bg-slate-50 border-2 rounded-3xl h-32 text-sm font-medium focus:border-indigo-500 outline-none transition-all" placeholder="如果不考慮我個人的情感，客觀專家會怎麼建議？" value={data.matrix.externalView} onChange={(e)=>setData({...data, matrix:{...data.matrix, externalView: e.target.value}})} />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">二階效應 (Second-order)</label>
+                                                    <textarea className="w-full p-5 bg-slate-50 border-2 rounded-3xl h-32 text-sm font-medium focus:border-indigo-500 outline-none transition-all" placeholder="這個決定在三個月、一年後產生的連鎖反應？" value={data.matrix.secondOrder} onChange={(e)=>setData({...data, matrix:{...data.matrix, secondOrder: e.target.value}})} />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
+
                                     {step === 3 && (
                                         <div className="fade-in">
                                             <div className="flex items-center gap-3 text-indigo-500 mb-8 font-black uppercase tracking-widest text-xs"><Icon name="compass" className="w-4 h-4" /> System 3 Simulation</div>
                                             <h2 className="text-4xl font-extrabold mb-10 tracking-tighter">未來模擬艙</h2>
                                             {!data.futureScript ? (
-                                                <button onClick={generateFutureScript} disabled={isAiLoading} className="w-full py-20 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[3.5rem] flex flex-col items-center gap-4 group hover:bg-indigo-100 transition-all">
-                                                    {isAiLoading ? <div className="loader"></div> : <Fragment><Icon name="zap" className="w-12 h-12 text-indigo-600 mb-2" /><span className="text-indigo-600 font-black uppercase tracking-[0.2em] text-sm">啟動 AI 情感渲染模擬</span></Fragment>}
+                                                <button onClick={generateFutureScript} disabled={isAiLoading} className="w-full py-24 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[3.5rem] flex flex-col items-center gap-6 group hover:bg-indigo-100 transition-all shadow-inner">
+                                                    {isAiLoading ? <div className="loader"></div> : <Fragment><Icon name="zap" className="w-16 h-16 text-indigo-600 mb-2 group-hover:scale-110 transition-transform" /><span className="text-indigo-600 font-black uppercase tracking-[0.2em] text-sm">消耗 1 點啟動深度情感模擬</span></Fragment>}
                                                 </button>
                                             ) : (
-                                                <div className="bg-slate-950 p-12 rounded-[3.5rem] shadow-2xl relative pricing-glow border border-slate-800">
+                                                <div className="bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl relative border border-slate-800">
                                                     <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 text-left">
-                                                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Simulation Success</span>
-                                                        <button onClick={()=>setData({...data, futureScript: ''})} className="text-[10px] text-white/40 hover:text-white uppercase font-bold transition-colors">重新生成</button>
+                                                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Simulation Result (Professional Quality)</span>
+                                                        <button onClick={()=>setData({...data, futureScript: ''})} className="text-[10px] text-white/40 hover:text-white uppercase font-bold tracking-widest transition-colors">Retry</button>
                                                     </div>
                                                     <p className="text-indigo-50 italic text-xl leading-relaxed whitespace-pre-wrap font-medium">{data.futureScript}</p>
                                                 </div>
                                             )}
                                         </div>
                                     )}
+
                                     {step === 4 && (
                                         <div className="fade-in">
                                             <div className="flex items-center gap-3 text-emerald-500 mb-8 font-black uppercase tracking-widest text-xs"><Icon name="zap" className="w-4 h-4" /> Action Nudges</div>
-                                            <h2 className="text-4xl font-extrabold mb-10 tracking-tighter text-slate-900">智慧行動助推</h2>
+                                            <h2 className="text-4xl font-extrabold mb-10 tracking-tighter text-slate-900 font-inter">智慧行動助推建議</h2>
                                             {isAiLoading ? (
                                                 <div className="p-20 flex flex-col items-center gap-6 text-center">
-                                                    <div className="loader border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent"></div>
-                                                    <p className="text-slate-400 font-bold animate-pulse tracking-widest uppercase text-xs">正在分析環境設置方案...</p>
-                                                </div>
-                                            ) : (
-                                                <div className="bg-emerald-50 p-12 rounded-[3.5rem] border border-emerald-100 text-emerald-950 font-bold leading-relaxed whitespace-pre-wrap text-lg">
-                                                    {data.nudges || "尚未獲得推薦內容。"}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    {step === 5 && (
-                                        <div className="text-center py-10 fade-in">
-                                            <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-10 shadow-2xl"><Icon name="crown" className="w-12 h-12" /></div>
-                                            <h2 className="text-5xl font-extrabold mb-6 tracking-tighter text-slate-900 leading-tight">審計已完成</h2>
-                                            <p className="text-slate-500 text-xl font-medium mb-12 max-w-lg mx-auto leading-relaxed">您的決策已完成 360 度的認知掃描。建議下載這份專業報告，作為日後對抗噪音與偏誤的基準。</p>
-                                            <button onClick={()=>window.print()} className="bg-indigo-600 text-white px-12 py-5 rounded-full font-black text-lg shadow-2xl hover:bg-black active:scale-95 transition-all flex items-center gap-4 mx-auto">
-                                                <Icon name="file" className="w-6 h-6" /> 下載 PDF 專業決策報告
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {step < 5 && (
-                                    <div className="mt-16 flex justify-between items-center pt-10 border-t border-slate-50">
-                                        <button onClick={()=>setStep(s=>Math.max(1, s-1))} disabled={step===1} className={`flex items-center gap-2 font-bold px-8 py-3 rounded-2xl transition-all ${step===1 ? 'text-slate-200' : 'text-slate-400 hover:bg-slate-100'}`}><Icon name="chevronLeft" className="w-5 h-5" /> BACK</button>
-                                        <button onClick={()=>setStep(s=>Math.min(5, s+1))} className="bg-slate-900 text-white px-12 py-4 rounded-full font-black flex items-center gap-3 hover:bg-indigo-600 shadow-2xl transition-all active:scale-95 uppercase text-sm tracking-widest">
-                                            {step === 4 ? 'Finish Audit' : 'Next Step'} <Icon name="chevronRight" className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {view === 'roadmap' && (
-                            <div className="fade-in space-y-16 text-left">
-                                <div className="text-center">
-                                    <h2 className="text-5xl font-extrabold tracking-tighter text-slate-900 mb-6 font-inter">產品發展路徑</h2>
-                                    <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">COGNAV Evolution Path 2024</p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                    {[
-                                        { title: "認知抓漏模組", desc: "實現 System 1 的直覺快速捕捉與情緒偏誤識別。", icon: "brain", status: "Done" },
-                                        { title: "Vercel 安全架構", desc: "透過 Serverless Proxy 完全隱藏 API Key，保障系統穩定性。", icon: "shield", status: "Done" },
-                                        { title: "智慧助推引擎", desc: "根據 AI 劇本模擬自動生成環境優化建議（當前核心）。", icon: "zap", status: "Active" },
-                                        { title: "付費會員體系", desc: "整合 Stripe 支付與會員系統，提供專業人士訂閱服務。", icon: "crown", status: "Next" }
-                                    ].map((item, i) => (
-                                        <div key={i} className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-                                            <div className="flex justify-between items-start mb-8">
-                                                <div className={`p-4 rounded-[1.5rem] transition-colors ${item.status === 'Done' ? 'bg-emerald-100 text-emerald-600' : (item.status === 'Active' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400')}`}><Icon name={item.icon} className="w-7 h-7" /></div>
-                                                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${item.status === 'Done' ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-500'}`}>{item.status}</span>
-                                            </div>
-                                            <h4 className="text-2xl font-extrabold mb-4 text-slate-900 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                            <p className="text-slate-500 font-medium leading-relaxed text-lg">{item.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'pricing' && (
-                            <div className="fade-in space-y-16">
-                                <div className="text-center">
-                                    <h2 className="text-5xl font-extrabold tracking-tighter text-slate-900 mb-6 font-inter">選擇您的方案</h2>
-                                    <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">Unlock Full Decision Power</p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-3xl mx-auto">
-                                    <div className="p-14 bg-white rounded-[4rem] border-2 border-slate-100 text-left hover:border-indigo-200 transition-all shadow-sm">
-                                        <h4 className="text-2xl font-black mb-2 text-slate-800 tracking-tight tracking-tighter">Starter</h4>
-                                        <p className="text-slate-400 mb-10 font-bold text-xs uppercase tracking-widest">個人決策探索</p>
-                                        <div className="text-5xl font-black mb-10 tracking-tighter">$0<span className="text-xl text-slate-300 ml-1">/mo</span></div>
-                                        <ul className="space-y-5 mb-12 text-sm font-bold text-slate-600">
-                                            <li className="flex gap-4 items-center"><Icon name="check" className="w-4 h-4 text-emerald-500" /> 基礎三系統審計</li>
-                                            <li className="flex gap-4 items-center opacity-30"><Icon name="check" className="w-4 h-4" /> AI 模擬渲染功能</li>
-                                            <li className="flex gap-4 items-center opacity-30"><Icon name="check" className="w-4 h-4" /> PDF 專業分析報告</li>
-                                        </ul>
-                                        <button onClick={()=>setView('audit')} className="w-full py-5 bg-slate-100 text-slate-400 rounded-3xl font-black uppercase tracking-widest text-[10px]">Current Plan</button>
-                                    </div>
-                                    <div className="p-14 bg-slate-950 rounded-[4rem] text-left text-white pricing-glow transform md:scale-105 border-4 border-indigo-600 relative overflow-hidden">
-                                        <div className="absolute top-0 right-10 bg-indigo-600 text-white text-[9px] font-black px-5 py-2 rounded-b-2xl uppercase tracking-[0.2em]">Recommended</div>
-                                        <h4 className="text-2xl font-black mb-2 tracking-tight">Pro</h4>
-                                        <p className="text-indigo-400 mb-10 font-bold text-xs uppercase tracking-widest font-inter">Enterprise AI Audit</p>
-                                        <div className="text-5xl font-black mb-10 tracking-tighter">$19.9<span className="text-xl text-slate-600 ml-1">/mo</span></div>
-                                        <ul className="space-y-5 mb-12 text-sm font-bold text-slate-300">
-                                            <li className="flex gap-4 items-center"><Icon name="check" className="w-4 h-4 text-indigo-400" /> 解鎖所有 AI 智慧生成模組</li>
-                                            <li className="flex gap-4 items-center"><Icon name="check" className="w-4 h-4 text-indigo-400" /> 生成可導出的 PDF 專業報告書</li>
-                                            <li className="flex gap-4 items-center"><Icon name="check" className="w-4 h-4 text-indigo-400" /> 歷史紀錄雲端儲存</li>
-                                        </ul>
-                                        <button className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest text-[10px] hover:bg-white hover:text-black transition-all shadow-xl shadow-indigo-900">Upgrade to Pro Now</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {aiError && (
-                            <div className="mt-12 p-5 bg-red-50 border border-red-100 rounded-3xl text-red-600 text-[11px] font-mono flex items-center gap-3">
-                                <Icon name="alert" className="w-5 h-5 shrink-0" />
-                                <span><b>SERVICE FAULT:</b> {aiError.msg}。請確認 Vercel 後端 API 是否已成功部署，且環境變數已正確設定。</span>
-                            </div>
-                        )}
-                    </main>
-
-                    <footer className="no-print mt-20 text-center pb-20 opacity-20 hover:opacity-40 transition-opacity">
-                        <div className="flex justify-center gap-10 mb-6">
-                            <Icon name="shield" className="w-5 h-5" />
-                            <Icon name="map" className="w-5 h-5" />
-                        </div>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.6em]">COGNAV LABS • SECURE SaaS INFRASTRUCTURE</p>
-                    </footer>
-
-                    {/* PDF 隱藏層 */}
-                    <div className="print-only">
-                        <PrintableReport data={data} />
-                    </div>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+                                                    <div className="loader border-t-emerald-500 border-r-transparent border-b-transparent border-
