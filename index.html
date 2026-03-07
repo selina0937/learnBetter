@@ -31,56 +31,28 @@
     <script type="text/babel">
         const { useState, useEffect, Fragment } = React;
 
-        // --- 商業化架構：API 代理邏輯 ---
-        // 當部署於 Vercel 時，前端不持有金鑰，而是呼叫 /api/generate
-        const getStoredKey = () => sessionStorage.getItem('COGNAV_API_KEY') || "";
-        const saveKeyToStorage = (key) => sessionStorage.setItem('COGNAV_API_KEY', key.trim());
-
-        async function callAiService(prompt, type = "general") {
-            const localKey = getStoredKey();
-            
-            // 優先嘗試呼叫你 Vercel 上的後端 API (商業隱藏金鑰模式)
-            // 如果你還沒寫好後端，這裡會失敗並跳轉到 localKey 模式
+        // --- 商業化核心：完全封閉前端 API 呼叫 ---
+        // 前端不再持有任何金鑰，只負責將指令傳送給自己的伺服器端點
+        async function callAiService(prompt) {
             try {
+                // 這是您部署在 Vercel 上的相對路徑
                 const response = await fetch('/api/cognav', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, type })
+                    body: JSON.stringify({ prompt })
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    return data.text;
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || "後端服務暫時無法連線，請檢查 Vercel 環境變數設定。");
                 }
+                
+                return data.text;
             } catch (e) {
-                console.log("切換至開發者手動金鑰模式");
+                console.error("API Error:", e);
+                throw { status: "ServiceError", msg: e.message };
             }
-
-            // 備援方案：如果後端不可用，則嘗試使用前端填寫的金鑰 (BYOK 模式)
-            if (!localKey) throw { status: "Auth", msg: "需要 API 設定。如果是商業部署，請確認後端 Function 已啟動；如果是開發者，請輸入金鑰。" };
-
-            const trials = [
-                { ver: 'v1beta', mod: 'gemini-2.5-flash' },
-                { ver: 'v1', mod: 'gemini-2.5-flash' }
-            ];
-
-            let lastErr = null;
-            for (let trial of trials) {
-                const url = `https://generativelanguage.googleapis.com/${trial.ver}/models/${trial.mod}:generateContent?key=${localKey}`;
-                try {
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                    });
-                    const data = await res.json();
-                    if (res.ok) return data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    lastErr = { status: res.status, msg: data.error?.message };
-                } catch (e) {
-                    lastErr = { status: "Network", msg: e.message };
-                }
-            }
-            throw lastErr;
         }
 
         // --- 組件：圖標渲染 ---
@@ -94,8 +66,6 @@
                     case 'map': return <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zm7-2v16m8-12v16" />;
                     case 'sparkles': return <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" />;
                     case 'file': return <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />;
-                    case 'settings': return <g><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></g>;
-                    case 'key': return <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3L15.5 7.5z"/>;
                     case 'zap': return <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />;
                     case 'shield': return <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />;
                     case 'chevronRight': return <polyline points="9 18 15 12 9 6" />;
@@ -114,13 +84,13 @@
         function RoadmapView() {
             return (
                 <div className="fade-in space-y-8 text-left">
-                    <h2 className="text-3xl font-extrabold text-indigo-900 text-center tracking-tighter">產品實施路徑</h2>
+                    <h2 className="text-3xl font-extrabold text-indigo-900 text-center tracking-tighter">商業服務路徑</h2>
                     <div className="space-y-6">
                         {[
-                            { title: "階段一：MVP 基礎建設", desc: "完成直覺捕捉與邏輯檢核基礎功能。", status: "Done" },
-                            { title: "階段二：AI 核心整合", desc: "實現系統三未來感官模擬劇本。", status: "Done" },
-                            { title: "階段三：智慧助推與環境", desc: "AI 自動根據決策生成環境助推方案 (Nudge)。", status: "Active" },
-                            { title: "階段四：商業化代理部署", desc: "使用 Vercel Proxy 隱藏金鑰並保護智慧財產。", status: "Testing" }
+                            { title: "基礎框架已就緒", desc: "系統一、二的邏輯審計模組已整合完成。", status: "Done" },
+                            { title: "AI 安全代理層 (當前)", desc: "透過 Vercel 後端隱藏 API 金鑰，提供企業級安全性。", status: "Active" },
+                            { title: "智慧助推行動方案", desc: "根據決策模擬結果自動產生環境優化清單。", status: "Active" },
+                            { title: "付費訂閱與使用者管理", desc: "未來將接入 Stripe 支付與會員系統，實現服務變現。", status: "Next" }
                         ].map((stage, idx) => (
                             <div key={idx} className={`flex gap-4 p-5 rounded-2xl border ${stage.status === 'Active' ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold ${stage.status === 'Done' ? 'bg-emerald-500 text-white' : (stage.status === 'Active' ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-white')}`}>{idx + 1}</div>
@@ -139,10 +109,10 @@
         function PrintableReport({ data }) {
             return (
                 <div className="p-12 bg-white text-slate-900 border border-slate-200 rounded-lg max-w-4xl mx-auto report-card text-left">
-                    <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-6 mb-8">
+                    <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-6 mb-8 text-left">
                         <div>
-                            <h1 className="text-3xl font-bold text-indigo-900 mb-1 font-inter uppercase tracking-tight">Decision Audit Report</h1>
-                            <p className="text-slate-500 text-sm italic font-medium tracking-wide">大腦三系統決策分析報告 • 商業化正式版</p>
+                            <h1 className="text-3xl font-bold text-indigo-900 mb-1 font-inter uppercase tracking-tight">COGNAV Audit Report</h1>
+                            <p className="text-slate-500 text-sm italic font-medium tracking-wide">三系統全方位決策分析報告 • 專業正式版</p>
                         </div>
                     </div>
                     <div className="space-y-10">
@@ -155,7 +125,7 @@
                             <div className="pl-4 space-y-2 font-medium text-slate-700">
                                 {data.system2Checks.map((item, i) => (
                                     <div key={i} className="flex items-center gap-3">
-                                        <span>{item.checked ? "✓ [已通過]" : "✗ [待驗證]"}</span>
+                                        <span>{item.checked ? "✓ [OK]" : "✗ [待查]"}</span>
                                         <span>{item.text}</span>
                                     </div>
                                 ))}
@@ -168,14 +138,14 @@
                             </div>
                         </section>
                         <section>
-                            <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-emerald-500 mb-3 uppercase tracking-widest text-xs">Step 4: Action (Nudge Plan)</h2>
+                            <h2 className="bg-slate-50 p-2 text-lg font-bold border-l-4 border-emerald-500 mb-3 uppercase tracking-widest text-xs">Step 4: Smart Actions</h2>
                             <div className="pl-4 space-y-4 font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
                                 {data.nudges || "⚠️ 未生成助推方案。"}
                             </div>
                         </section>
                     </div>
                     <div className="mt-20 pt-8 border-t border-slate-100 text-center text-slate-400 text-[10px] tracking-widest uppercase font-bold">
-                        <p>© 2024 COGNAV Decision System • Built on Vercel Edge Runtime</p>
+                        <p>© 2024 COGNAV Decision System • Secure Commercial Edition</p>
                     </div>
                 </div>
             );
@@ -188,8 +158,6 @@
             const [isAiLoading, setIsAiLoading] = useState(false);
             const [isNudgeLoading, setIsNudgeLoading] = useState(false);
             const [aiError, setAiError] = useState(null);
-            const [showKeyModal, setShowKeyModal] = useState(false);
-            const [tempKey, setTempKey] = useState(getStoredKey());
             
             const [data, setData] = useState({
                 decision: '',
@@ -212,15 +180,11 @@
             const generateNudges = async () => {
                 setIsNudgeLoading(true);
                 try {
-                    const prompt = `你是行為經濟學專家。針對使用者決策：『${data.decision}』及其未來願景：『${data.futureScript}』，生成 3 個具體的環境助推（Nudge）方案：
-                    1. 負面摩擦力（如何讓分心變難）
-                    2. 正面助推（如何讓執行變簡單）
-                    3. 環境視覺標記（如何隨時提醒願景）
-                    請直接輸出條列內容。`;
-                    const text = await callAiService(prompt, "nudge");
+                    const prompt = `你是行為經濟學家。根據使用者決策：『${data.decision}』及其未來願景：『${data.futureScript}』，設計 3 個環境助推方案。1. 負面行為摩擦力 2. 正面行為助推 3. 視覺提醒。條列輸出內容即可。`;
+                    const text = await callAiService(prompt);
                     setData(prev => ({...prev, nudges: text}));
                 } catch (e) {
-                    console.error(e);
+                    setAiError(e);
                 } finally {
                     setIsNudgeLoading(false);
                 }
@@ -230,12 +194,11 @@
                 if (!data.decision) return;
                 setIsAiLoading(true); setAiError(null);
                 try {
-                    const prompt = `你是認知科學家。針對決策：『${data.decision}』，生成一段 300 字、具備高度感官細節（視覺、聽覺、情感）的系統三成功模擬。`;
-                    const text = await callAiService(prompt, "script");
+                    const prompt = `你是認知科學家。針對決策：『${data.decision}』，生成一段 300 字、感官細節豐富的『系統三』成功模擬劇本。直接輸出內容。`;
+                    const text = await callAiService(prompt);
                     setData(prev => ({...prev, futureScript: text}));
                 } catch (e) { 
                     setAiError(e); 
-                    if (e.status === "Auth") setShowKeyModal(true);
                 } finally { setIsAiLoading(false); }
             };
 
@@ -249,13 +212,9 @@
                                     <button onClick={() => setView('flow')} className={`px-6 py-2 rounded-xl font-bold transition-all ${view === 'flow' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>互動原型</button>
                                     <button onClick={() => setView('roadmap')} className={`px-6 py-2 rounded-xl font-bold transition-all ${view === 'roadmap' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>實施路徑</button>
                                 </div>
-                                <div className="flex gap-2">
-                                    <div className="hidden md:flex items-center px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-100">
-                                        <Icon name="shield" className="w-3 h-3 mr-1" /> PROTECTED MODE
-                                    </div>
-                                    <button onClick={() => setShowKeyModal(true)} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all">
-                                        <Icon name="settings" className="w-5 h-5" />
-                                    </button>
+                                <div className="flex items-center px-4 py-2 bg-indigo-900 text-indigo-100 rounded-2xl text-[11px] font-bold border border-indigo-700 shadow-lg">
+                                    <Icon name="shield" className="w-3.5 h-3.5 mr-2 text-indigo-400" /> 
+                                    <span className="tracking-widest uppercase">Commercial Proxy Active</span>
                                 </div>
                             </div>
 
@@ -265,14 +224,14 @@
                                     <Fragment>
                                         {step === 1 && (
                                             <div className="fade-in">
-                                                <h2 className="text-3xl font-extrabold mb-4 text-indigo-900 tracking-tighter">捕捉直覺</h2>
-                                                <p className="text-slate-500 mb-8 text-sm font-medium italic">在數據介入前，寫下大腦最初始、最真實的聲音。</p>
-                                                <textarea className="w-full p-6 bg-slate-50 border-2 rounded-3xl h-44 outline-none focus:border-indigo-500 font-medium text-lg shadow-inner" placeholder="例如：我想把儲蓄投入這次的投資計畫..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
+                                                <h2 className="text-3xl font-extrabold mb-4 text-indigo-900 tracking-tighter italic">捕捉直覺</h2>
+                                                <p className="text-slate-500 mb-8 text-sm font-medium">大腦最初始、最誠實的聲音是什麼？</p>
+                                                <textarea className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-3xl h-44 outline-none focus:border-indigo-500 font-medium text-lg shadow-inner transition-all" placeholder="例如：我想立刻把資金投入這個計畫..." value={data.decision} onChange={(e)=>setData({...data, decision: e.target.value})} />
                                             </div>
                                         )}
                                         {step === 2 && (
                                             <div className="fade-in">
-                                                <h2 className="text-3xl font-extrabold mb-8 tracking-tighter">理智檢核</h2>
+                                                <h2 className="text-3xl font-extrabold mb-8 tracking-tighter">理智審計</h2>
                                                 <div className="space-y-4">
                                                     {data.system2Checks.map((item, i) => (
                                                         <div key={i} onClick={() => {
@@ -289,44 +248,48 @@
                                         )}
                                         {step === 3 && (
                                             <div className="fade-in text-center">
-                                                <h2 className="text-3xl font-extrabold mb-8 tracking-tighter">未來模擬艙</h2>
+                                                <h2 className="text-3xl font-extrabold mb-8 tracking-tighter">系統三模擬</h2>
                                                 {!data.futureScript ? (
                                                     <button onClick={handleAiGeneration} disabled={isAiLoading} className="w-full py-10 bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:bg-indigo-100 transition-all text-indigo-600 font-bold group">
-                                                        {isAiLoading ? <div className="loading-spinner"></div> : <Fragment><Icon name="sparkles" className="w-10 h-10 group-hover:scale-110 transition-transform" /><span>啟動 AI 感官渲染</span></Fragment>}
+                                                        {isAiLoading ? <div className="loading-spinner"></div> : <Fragment><Icon name="sparkles" className="w-10 h-10 group-hover:scale-110 transition-transform" /><span>啟動後端感官渲染</span></Fragment>}
                                                     </button>
                                                 ) : (
                                                     <div className="p-8 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl relative text-left">
                                                         <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">System 3 Vision</span>
-                                                            <button onClick={() => setData({...data, futureScript: ''})} className="text-[10px] text-slate-400 hover:text-white uppercase font-bold">重置</button>
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">Future Vision Script</span>
+                                                            <button onClick={() => setData({...data, futureScript: ''})} className="text-[10px] text-slate-400 hover:text-white uppercase font-bold">重新模擬</button>
                                                         </div>
                                                         <p className="text-slate-200 italic leading-relaxed whitespace-pre-wrap font-medium">{data.futureScript}</p>
                                                     </div>
                                                 )}
-                                                {aiError && <p className="mt-4 text-red-500 text-xs font-mono break-all">{aiError.msg}</p>}
+                                                {aiError && (
+                                                    <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-[11px] font-mono leading-relaxed text-left">
+                                                        <b>錯誤：</b> {aiError.msg}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         {step === 4 && (
                                             <div className="fade-in">
                                                 <div className="flex items-center gap-3 text-emerald-600 mb-6">
                                                     <Icon name="zap" className="w-6 h-6" />
-                                                    <h2 className="text-3xl font-extrabold tracking-tighter">智慧助推建議</h2>
+                                                    <h2 className="text-3xl font-extrabold tracking-tighter">智慧行動助推</h2>
                                                 </div>
                                                 <div className="space-y-4">
                                                     {isNudgeLoading ? (
                                                         <div className="p-12 bg-emerald-50 rounded-[2rem] flex flex-col items-center gap-4 text-emerald-700">
                                                             <div className="loading-spinner border-t-emerald-600"></div>
-                                                            <p className="font-bold animate-pulse">正在設計環境助推方案...</p>
+                                                            <p className="font-bold animate-pulse">正在生成個人化環境方案...</p>
                                                         </div>
                                                     ) : (
-                                                        <div className="bg-emerald-50 p-8 rounded-[2rem] border border-emerald-100 text-emerald-900 font-medium leading-relaxed whitespace-pre-wrap">
-                                                            {data.nudges || "正在生成建議中..."}
+                                                        <div className="bg-emerald-50 p-8 rounded-[2rem] border border-emerald-100 text-emerald-900 font-medium leading-relaxed whitespace-pre-wrap text-sm">
+                                                            {data.nudges || "內容生成中..."}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="mt-12 text-center py-6 border-t border-slate-50">
-                                                    <button onClick={() => window.print()} className="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold shadow-xl hover:bg-indigo-700 flex items-center gap-3 mx-auto active:scale-95 shadow-indigo-100 transition-all">
-                                                        <Icon name="file" className="w-5 h-5" /> 下載 PDF 決策報告
+                                                    <button onClick={() => window.print()} className="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold shadow-xl hover:bg-indigo-700 flex items-center gap-3 mx-auto active:scale-95 transition-all">
+                                                        <Icon name="file" className="w-5 h-5" /> 下載 PDF 專業決策報告
                                                     </button>
                                                 </div>
                                             </div>
@@ -335,7 +298,7 @@
                                         {step < 4 && (
                                             <div className="mt-12 flex justify-between items-center pt-8 border-t border-slate-50">
                                                 <button onClick={() => setStep(s => s - 1)} disabled={step === 1} className={`font-bold flex items-center gap-1 ${step === 1 ? 'text-slate-200' : 'text-slate-400 hover:text-slate-600 transition-colors'}`}><Icon name="chevronLeft" className="w-5 h-5" /> 上一步</button>
-                                                <button onClick={() => setStep(s => s + 1)} className="bg-slate-900 text-white px-10 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-black shadow-lg active:scale-95">下一步 <Icon name="chevronRight" className="w-5 h-5" /></button>
+                                                <button onClick={() => setStep(s => s + 1)} className="bg-slate-900 text-white px-10 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-black shadow-lg transition-all active:scale-95">下一步 <Icon name="chevronRight" className="w-5 h-5" /></button>
                                             </div>
                                         )}
                                     </Fragment>
@@ -345,32 +308,6 @@
                             </div>
                         </div>
                     </div>
-
-                    {/* 金鑰/模式彈窗 */}
-                    {showKeyModal && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl fade-in border border-indigo-50">
-                                <div className="flex items-center gap-3 text-indigo-600 mb-6">
-                                    <div className="bg-indigo-50 p-2 rounded-xl"><Icon name="shield" className="w-6 h-6" /></div>
-                                    <h3 className="text-2xl font-extrabold tracking-tight text-left">系統管理員設定</h3>
-                                </div>
-                                <p className="text-slate-500 mb-6 text-sm font-medium leading-relaxed text-left">
-                                    此網頁已配置為<b>商業代理模式</b>。若您在本地運行或後端未就緒，可以切換至開發者模式手動輸入 Key。
-                                </p>
-                                <input 
-                                    type="password" 
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 outline-none mb-6 font-mono text-sm shadow-inner" 
-                                    placeholder="輸入個人 API Key (僅限開發測試)" 
-                                    value={tempKey}
-                                    onChange={(e)=>setTempKey(e.target.value)}
-                                />
-                                <div className="flex gap-3">
-                                    <button onClick={() => setShowKeyModal(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold hover:bg-slate-200 transition-all text-slate-600 text-sm">取消</button>
-                                    <button onClick={() => { saveKeyToStorage(tempKey); setShowKeyModal(false); }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg text-sm">儲存設定</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     
                     {/* PDF 隱藏報告 */}
                     <div className="print-only"><PrintableReport data={data} /></div>
