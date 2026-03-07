@@ -1,8 +1,10 @@
 /**
  * COGNAV 商業化後端代理 - v4.6 安全與扣費增強版
+ * 解決內容中斷、點數扣費與 Token 限制問題
  */
 
 export default async function handler(req, res) {
+  // 1. 安全檢查：只允許 POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -10,13 +12,15 @@ export default async function handler(req, res) {
   const { prompt, type, currentCredits } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // 1. 模擬後端餘額檢查
+  // 2. 模擬後端點數校驗 (商業模式核心)
   if (currentCredits <= 0) {
-    return res.status(402).json({ error: '您的點數已用罄，請先儲值以繼續使用專業審計功能。' });
+    return res.status(402).json({ 
+      error: '您的點數已用罄。單次決策審計僅需 NT$10，請前往儲值。' 
+    });
   }
 
   if (!apiKey) {
-    return res.status(500).json({ error: '伺服器配置錯誤：缺少 API Key' });
+    return res.status(500).json({ error: '伺服器配置錯誤：缺少 GEMINI_API_KEY 環境變數' });
   }
 
   // 使用 Gemini 2.5 Flash 穩定端點
@@ -29,10 +33,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: type === 'script' ? 0.9 : 0.4, // 模擬劇本給予高創意，助推建議給予高穩定度
+          // 模擬劇本(script)給予較高創意；助推建議(nudge)給予高精準度
+          temperature: type === 'script' ? 0.95 : 0.4, 
           topP: 0.95,
-          maxOutputTokens: 2000, // 大幅提升 Token 限制，解決斷尾問題
-          stopSequences: []
+          maxOutputTokens: 2500, // 提升限制，徹底解決「寫一部分就斷掉」的問題
         }
       })
     });
@@ -47,7 +51,7 @@ export default async function handler(req, res) {
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
-    // 回傳生成的文本與新的餘額 (前端會同步扣除)
+    // 3. 成功回傳並回報扣點結果
     res.status(200).json({ 
       text,
       deducted: 1,
